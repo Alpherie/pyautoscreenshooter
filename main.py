@@ -227,6 +227,11 @@ class SettingsMenu(PyQt5.QtWidgets.QDialog):
         cfg.set('Section', 'user', user)
         cfg.set('Section', 'password', password)
         self.mainlabel.setText('Settings are submitted!')
+
+        f = open('pyautoscreenshooter.cfg', 'w')
+        cfg.write(f)
+        f.close()
+        
         global cfg_update
         cfg_update.emit()
         return
