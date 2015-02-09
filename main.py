@@ -79,12 +79,13 @@ def send_screenshot(cfg, img, to_sched):
         to_sched.send(('message', message))
     return
 
-def make_action(cfg, scheduler, to_sched, to_gui):
-    filename = make_screenshot(cfg, to_gui)
-    scheduler.enter(int(cfg.get('Section', 'timeout', fallback='5')), 1, make_action, argument=(cfg, scheduler, to_sched, to_gui))
+def make_action(scheduler, to_sched, to_gui):
+    global cfg2
+    filename = make_screenshot(cfg2, to_gui)
+    scheduler.enter(int(cfg2.get('Section', 'timeout', fallback='5')), 1, make_action, argument=(scheduler, to_sched, to_gui))
     to_sched.send('run that fucking scheduler!')
     if filename != None:
-        send_screenshot(cfg, filename, to_gui)
+        send_screenshot(cfg2, filename, to_gui)
     #scheduler.run()
     return
 
@@ -97,19 +98,20 @@ def scheduler_process(stop_e, scheduler, to_sched):
 
 def new_process(from_gui, stop_e):
     scheduler = sched.scheduler(time.time, time.sleep)
-    cfg = None
+    global cfg2
+    cfg2 = None
     to_sched, to_sched2 = mp.Pipe()
     sched_thread = thr.Thread(target=scheduler_process, args=(stop_e, scheduler, to_sched))
     sched_thread.start()
     while not stop_e.is_set():
-        if from_gui.poll(1):
+        if from_gui.poll():
             got_obj = from_gui.recv()
             if got_obj[0] == 'config':
-                if cfg is None:
-                    cfg = got_obj[1]
-                    scheduler.enter(int(cfg.get('Section', 'timeout', fallback='5')), 1, make_action, argument=(cfg, scheduler, to_sched2, from_gui))
+                if cfg2 is None:
+                    cfg2 = got_obj[1]
+                    scheduler.enter(int(cfg2.get('Section', 'timeout', fallback='5')), 1, make_action, argument=(scheduler, to_sched2, from_gui))
                 else:
-                    cfg = got_obj[1]
+                    cfg2 = got_obj[1]
                 to_sched2.send('run forest run')
 
 def init():
@@ -208,7 +210,7 @@ class SettingsMenu(PyQt5.QtWidgets.QDialog):
         except ValueError:
             self.mainlabel.setText('Incorrect timeout!')
             return
-        if timeout <= 0:
+        if timeout <= 1:
             self.mainlabel.setText('Incorrect timeout!')
             return
         url = self.urltext.text()
@@ -227,7 +229,7 @@ class SettingsMenu(PyQt5.QtWidgets.QDialog):
         cfg.set('Section', 'user', user)
         cfg.set('Section', 'password', password)
         self.mainlabel.setText('Settings are submitted!')
-
+        
         f = open('pyautoscreenshooter.cfg', 'w')
         cfg.write(f)
         f.close()
